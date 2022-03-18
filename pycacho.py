@@ -1,5 +1,5 @@
 import argparse
-from datetime import datetime
+from datetime import datetime, tzinfo
 import logging
 import os
 import sqlite3
@@ -31,7 +31,7 @@ class CachoDBManager():
         self.cur.execute('''CREATE TABLE players
                             (id integer PRIMARY KEY, description text)''')
         self.cur.execute('''CREATE TABLE sessions
-                            (id integer PRIMARY KEY, date text)''')
+                            (id integer PRIMARY KEY, date text, winner integer, looser integer)''')
         self.cur.execute('''CREATE TABLE scores
                             (id integer PRIMARY KEY, player_id integer, session_id integer, game_id integer, ones integer, twos integer, threes integer, fours integer, fives integer, sixes integer, straight integer, full integer, poker integer, grande integer, tutti integer)''')
         self.con.commit()
@@ -45,7 +45,7 @@ class CachoDBManager():
         table = self.get_table(table)
         for row in table:
             print(row)
-    def get_table(self, table):
+    def get_table(self, table: str):
         self.cur.execute(f'SELECT * FROM {table}')
         return self.cur.fetchall()
     def create_player(self, player_name):
@@ -56,8 +56,19 @@ class CachoDBManager():
         return [x[0] for x in self.cur.fetchall()]
     def create_session(self):
         """ docstring """
-        now = datetime.now().strftime('%s')
+        now = int(datetime.now().timestamp())
         return self.insert("sessions", (now,))
+    def get_session_date(self, session_id: int) -> datetime:
+        self.cur.execute(f"SELECT date FROM sessions WHERE id = {session_id}")
+        epoch = self.cur.fetchone()[0]
+        return datetime.fromtimestamp(int(epoch))
+    def set_session_winner(self, session_id: int, player_id: int):
+        self.update_sessions_table(session_id, "winner", str(player_id))
+    def set_session_looser(self, session_id: int, player_id: int):
+        self.update_sessions_table(session_id, "looser", str(player_id))
+    def update_sessions_table(self, session_id: int, col: str, value: str):
+        self.cur.execute(f"UPDATE sessions SET {col} = {value} WHERE id = {session_id}")
+        self.con.commit()
     def create_game(self, players, description="generic game"):
         """ docstring """
         logging.debug(f"Creating game, number of players: {len(players)}")
@@ -66,19 +77,19 @@ class CachoDBManager():
         return self.insert("games", (players_str, description,))
     def create_score(self, player_id, session_id, game_id):
         """ docstring """
-        return self.insert("scores", (player_id, session_id, game_id, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,))
+        return self.insert("scores", (player_id, session_id, game_id, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0,))
     def get_player_name(self, player_id: int) -> str:
         """ docstring """
         self.cur.execute(f"SELECT description from players WHERE id = {player_id};")
         return self.cur.fetchone()[0]
-    def update_score(self, score_id, position, value):
+    def update_score(self, score_id: int, col: str, value: int):
         """ docstring """
-        self.cur.execute(f"UPDATE scores SET {position} = {value} WHERE id = {score_id}")
+        self.cur.execute(f"UPDATE scores SET {col} = {value} WHERE id = {score_id}")
         self.con.commit()
-    def delete_record_id(self, table, rid):
+    def delete_record_id(self, table: str, rid: int):
         self.cur.execute(f"DELETE FROM {table} WHERE id = {rid}")
         self.con.commit()
-    def get_score(self, score_id):
+    def get_score(self, score_id: int):
         """ docstring """
         self.cur.execute(f"SELECT * FROM scores WHERE id = {score_id}")
         return self.cur.fetchone()
@@ -91,15 +102,7 @@ class CachoDBManager():
         self.cur.execute(insert_str, entities)
         self.con.commit()
         return self.get_last_row_id()
-    def update(self, table):
-        """ docstring """
-        pass
-    def delete(self, table):
-        """ docstring """
-        pass
-    def create(self, table):
-        """ docstring """
-        pass
+
 
 class CachoManager():
     """ docstring """
@@ -181,11 +184,17 @@ class CachoManager():
     def get_player_order(self):
         return self.player_queue
     def delete_current_session(self):
-        for k,v in self.player_scores.items():
+        for _, v in self.player_scores.items():
             logging.debug(f"Deleting score id: {v}")
             self.db.delete_record_id("scores", v)
         logging.debug(f"Deleting session id: {self.curr_session_id}")
         self.db.delete_record_id("sessions", self.curr_session_id)
+    def end_current_session(self):
+        for k, v in self.player_scores.items():
+
+            for score in self.db.get_score(v):
+                logging.debug(f"score: {score}")
+
     def get_current_total(self):
         return self.get_total(self.get_current_player_score_card())
     def get_total(self, scores):
@@ -202,6 +211,8 @@ class CachoManager():
             score_id = self.db.create_score(player_id, self.curr_session_id, self.curr_game_id)
             self.player_scores[str(player_id)] = score_id
         return self.curr_session_id
+    
+
 def print_line():
     print("================================")
 def print_games(cm):
@@ -268,7 +279,6 @@ def print_current_player_card(cm):
 def print_player_card(cm, player_id):
     print_line()
     player_name = cm.db.get_player_name(player_id)
-    #score_card = cm.get_current_player_score_card()
     score_card = cm.get_score_card(cm.player_scores[str(player_id)])
     one = score_card[4]
     two = score_card[5]
@@ -312,6 +322,7 @@ def session_menu(cm):
             cm.delete_current_session()
             sys.exit()
         elif select == 'e':
+            cm.end_current_session()
             sys.exit()
     while True:
         value = input("Value: ")
@@ -388,7 +399,9 @@ if __name__ == "__main__":
         sys.exit()
     if args.list_sessions:
         db = CachoDBManager()
-        db.print_table("sessions")
+        table = db.get_table("sessions")
+        for row in table:
+            print(f"id: {row[0]} date: {db.get_session_date(int(row[0]))}")
         sys.exit()
     if args.create_game:
         game_create_menu(CachoManager(), args.create_game)

@@ -1,3 +1,15 @@
 {
-    "image": "python:latest"
+    "build": {
+        "dockerfile": "../Dockerfile",
+        "context": "..",
+        "args": {
+            "NEWUSER": "${localEnv:USERNAME}"
+        }
+    },
+    "extensions": [
+        "ms-python.python",
+        "jcbuisson.vue",
+        "esbenp.prettier-vscode"
+    ],
+    "remoteUser": "${localEnv:USERNAME}"
 }
