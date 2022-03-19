@@ -1,0 +1,29 @@
+<html>
+    <title>{{ title }}</title>
+    <body>
+        {% for k, v in data.items() %}
+        <table>
+            <tr><td>{{ k }}</td></tr>
+            <tr>
+                <td>Balas: {{ v["ones"] if v["ones"] != -1 else "" }}</td>
+                <td>Escalera: {{ v["straight"] }}</td>
+                <td>Cuadras: {{ v["fours"] }}</td>
+            </tr>
+            <tr>
+                <td>Duces: {{ v["twos"] }}</td>
+                <td>Full: {{ v["full"] }}</td>
+                <td>Qinas: {{ v["fives"] }}</td>
+            </tr>
+            <tr>
+                <td>Trenes: {{ v["threes"] if v["ones"] != -1 else "" }}</td>
+                <td>Poker: {{ v["poker"] }}</td>
+                <td>Sena: {{ v["sixes"] }}</td>
+            </tr>
+            <tr>
+                <td>Grande: {{ v["grande"] }}</td>
+                <td>Tutti: {{ v["tutti"] }}</td>
+            </tr>
+        </table>
+        {% endfor %}
+    </body>
+</html>

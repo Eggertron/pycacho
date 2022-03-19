@@ -5,6 +5,8 @@ import os
 import sqlite3
 import sys
 
+from flask import session
+
 logging.basicConfig(level=logging.DEBUG)
 
 class CachoDBManager():
@@ -31,7 +33,7 @@ class CachoDBManager():
         self.cur.execute('''CREATE TABLE players
                             (id integer PRIMARY KEY, description text)''')
         self.cur.execute('''CREATE TABLE sessions
-                            (id integer PRIMARY KEY, date text, winner integer, looser integer)''')
+                            (id integer PRIMARY KEY, date text, high_score_id integer, low_score_id integer)''')
         self.cur.execute('''CREATE TABLE scores
                             (id integer PRIMARY KEY, player_id integer, session_id integer, game_id integer, ones integer, twos integer, threes integer, fours integer, fives integer, sixes integer, straight integer, full integer, poker integer, grande integer, tutti integer)''')
         self.con.commit()
@@ -62,10 +64,10 @@ class CachoDBManager():
         self.cur.execute(f"SELECT date FROM sessions WHERE id = {session_id}")
         epoch = self.cur.fetchone()[0]
         return datetime.fromtimestamp(int(epoch))
-    def set_session_winner(self, session_id: int, player_id: int):
-        self.update_sessions_table(session_id, "winner", str(player_id))
-    def set_session_looser(self, session_id: int, player_id: int):
-        self.update_sessions_table(session_id, "looser", str(player_id))
+    def set_session_winner(self, session_id: int, score_id: int):
+        self.update_sessions_table(session_id, "high_score_id", str(score_id))
+    def set_session_looser(self, session_id: int, score_id: int):
+        self.update_sessions_table(session_id, "low_score_id", str(score_id))
     def update_sessions_table(self, session_id: int, col: str, value: str):
         self.cur.execute(f"UPDATE sessions SET {col} = {value} WHERE id = {session_id}")
         self.con.commit()
@@ -93,6 +95,29 @@ class CachoDBManager():
         """ docstring """
         self.cur.execute(f"SELECT * FROM scores WHERE id = {score_id}")
         return self.cur.fetchone()
+    def get_scores_from_session_id(self, session_id: int):
+        self.cur.execute(f"SELECT * FROM scores WHERE session_id = {session_id}")
+        return self.cur.fetchall()
+    def get_scores_from_session_id_dict(self, session_id: int) -> dict:
+        result = {}
+        logging.debug(self.get_scores_from_session_id(session_id))
+        for score in self.get_scores_from_session_id(session_id):
+            _, player_id, _, game_id, o, t, th, f, fi, s, st, fu, p, g, tu = score
+            result[player_id] = {
+                "game_id": game_id,
+                "ones": o,
+                "twos": t,
+                "threes": th,
+                "fours": f,
+                "fives": fi,
+                "sixes": s,
+                "straight": st,
+                "full": fu,
+                "poker": p,
+                "grande": g,
+                "tutti": tu
+            }
+        return result
     def get_game(self, game_id):
         self.cur.execute(f"SELECT * FROM games WHERE id = {game_id}")
         return self.cur.fetchone()
@@ -122,7 +147,7 @@ class CachoManager():
     def set_score_threes(self, value, sid):
         self.db.update_score(sid, "threes", value)
     def set_current_score_threes(self, value):
-        self.set_score_three(value, self.get_current_player_score_id())
+        self.set_score_threes(value, self.get_current_player_score_id())
     def set_score_fours(self, value, sid):
         self.db.update_score(sid, "fours", value)
     def set_current_score_fours(self, value):
@@ -190,10 +215,34 @@ class CachoManager():
         logging.debug(f"Deleting session id: {self.curr_session_id}")
         self.db.delete_record_id("sessions", self.curr_session_id)
     def end_current_session(self):
+        high_score_id = None
+        low_score_id = None
+        low_score_value = 10000
+        high_score_value = 0
+        score_cols = ["id", "player_id", "session_id", "game_id", "ones", "twos", "threes", "fours", "fives", "sixes", "straight", "full", "poker", "grande", "tutti"]
         for k, v in self.player_scores.items():
-
-            for score in self.db.get_score(v):
+            sub_total = 0
+            for index, score in enumerate(self.db.get_score(v)):
                 logging.debug(f"score: {score}")
+                if index < 4:
+                    continue
+                print(f"Score type: {type(score)}")
+                if score == -1:
+                    self.db.update_score(v, score_cols[index], 0)  # update the scores
+                else:
+                    sub_total += score
+                logging.debug(f"Updated score: {self.db.get_score(v)}")
+            logging.debug(f"Total for this score: {sub_total}")
+            if sub_total > high_score_value:
+                logging.debug(f"New high score replaces {high_score_value}")
+                high_score_value = sub_total
+                high_score_id = v
+                self.db.set_session_winner(self.curr_session_id, high_score_id)
+            elif sub_total < low_score_value:
+                logging.debug(f"New low score replaces {low_score_value}")
+                low_score_value = sub_total
+                low_score_id = v
+                self.db.set_session_looser(self.curr_session_id, low_score_id)
 
     def get_current_total(self):
         return self.get_total(self.get_current_player_score_card())
@@ -401,7 +450,7 @@ if __name__ == "__main__":
         db = CachoDBManager()
         table = db.get_table("sessions")
         for row in table:
-            print(f"id: {row[0]} date: {db.get_session_date(int(row[0]))}")
+            print(f"id: {row[0]} date: {db.get_session_date(int(row[0]))} high score id: {row[2]} low score id: {row[3]}")
         sys.exit()
     if args.create_game:
         game_create_menu(CachoManager(), args.create_game)
