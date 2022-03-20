@@ -5,10 +5,6 @@ import os
 import sqlite3
 import sys
 
-from flask import session
-
-logging.basicConfig(level=logging.DEBUG)
-
 class CachoDBManager():
     TABLES_INSERT ={
                 "players": "INSERT INTO players(id, description) VALUES(NULL, ?)",
@@ -16,6 +12,7 @@ class CachoDBManager():
                 "games": "INSERT INTO games(id, players, description) VALUES(NULL, ?, ?)",
                 "scores": "INSERT INTO scores(id, player_id, session_id, game_id, ones, twos, threes, fours, fives, sixes, straight, full, poker, grande, tutti) VALUES(NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             }
+    SCORE_COLS = ["id", "player_id", "session_id", "game_id", "ones", "twos", "threes", "fours", "fives", "sixes", "straight", "full", "poker", "grande", "tutti"]
     def __init__(self, db="cacho_data.db"):
         """ docstring """
         self.init_all_tables = False
@@ -60,12 +57,22 @@ class CachoDBManager():
         """ docstring """
         now = int(datetime.now().timestamp())
         return self.insert("sessions", (now,))
+    def get_sessions_by_player_id(self, player_id: int):
+        self.cur.execute(f"SELECT * FROM sessions WHERE player_id = {player_id}")
+        return self.cur.fetchall()
     def get_session_date(self, session_id: int) -> datetime:
         self.cur.execute(f"SELECT date FROM sessions WHERE id = {session_id}")
         epoch = self.cur.fetchone()[0]
         return datetime.fromtimestamp(int(epoch))
     def set_session_winner(self, session_id: int, score_id: int):
         self.update_sessions_table(session_id, "high_score_id", str(score_id))
+    def get_sessions_verb_by_player_id(self, verb, player_id: int) -> list:
+        self.cur.execute(f"SELECT sessions.id FROM sessions INNER JOIN scores ON sessions.{verb} = scores.id INNER JOIN players ON players.id = scores.player_id WHERE players.id = {player_id}")
+        return [ x[0] for x in self.cur.fetchall() ]
+    def get_sessions_lowest_by_player_id(self, player_id: int) -> list:
+        return self.get_sessions_verb_by_player_id("low_score_id", player_id)
+    def get_sessions_won_by_player_id(self, player_id: int) -> list:
+        return self.get_sessions_verb_by_player_id("high_score_id", player_id)
     def set_session_looser(self, session_id: int, score_id: int):
         self.update_sessions_table(session_id, "low_score_id", str(score_id))
     def update_sessions_table(self, session_id: int, col: str, value: str):
@@ -117,6 +124,21 @@ class CachoDBManager():
                 "grande": g,
                 "tutti": tu
             }
+        return result
+    def get_scores_by_player_id_as_dict_list(self, player_id: int) -> list:
+        return [self.score_to_dict(x) for x in self.get_scores_by_player_id(player_id)]
+    def get_scores_by_player_id(self, player_id: int):
+        self.cur.execute(f"SELECT * FROM scores WHERE player_id = {player_id}")
+        return self.cur.fetchall()
+    def score_to_dict(self, score_list) -> dict:
+        result = {}
+        total = 0
+        for index, value in enumerate(score_list):
+            col = self.SCORE_COLS[index]
+            result[col] = value
+            if "id" not in col:
+                total += value
+        result["total"] = total
         return result
     def get_game(self, game_id):
         self.cur.execute(f"SELECT * FROM games WHERE id = {game_id}")
@@ -226,7 +248,6 @@ class CachoManager():
                 logging.debug(f"score: {score}")
                 if index < 4:
                     continue
-                print(f"Score type: {type(score)}")
                 if score == -1:
                     self.db.update_score(v, score_cols[index], 0)  # update the scores
                 else:
@@ -260,6 +281,35 @@ class CachoManager():
             score_id = self.db.create_score(player_id, self.curr_session_id, self.curr_game_id)
             self.player_scores[str(player_id)] = score_id
         return self.curr_session_id
+    def generate_player_stats(self, player_id: int) -> dict:
+        scores = self.db.get_scores_by_player_id_as_dict_list(player_id)
+        games_played = len(scores)
+        total_grandes = 0
+        total_tuttis = 0
+        total_wins = self.db.get_sessions_won_by_player_id(player_id)
+        print(f"sessions won: {total_wins}")
+        total_last = self.db.get_sessions_lowest_by_player_id(player_id)
+        print(f"sessions lowest score: {total_last}")
+        total_score = 0
+        high_score = 0
+        for score in scores:
+            if score['grande'] > 0:
+                total_grandes += 1
+            if score["tutti"] > 0:
+                total_tuttis += 1
+            if score["total"] > high_score:
+                high_score = score["total"]
+            total_score += score["total"]
+        return {
+            "player name": self.db.get_player_name(player_id),
+            "games played": games_played,
+            "high score": high_score,
+            "average score": total_score / games_played,
+            "total Grandes": total_grandes,
+            "total Tuttis": total_tuttis,
+            "total wins": len(total_wins),
+            "total last place": len(total_last)
+        }
     
 
 def print_line():
@@ -349,7 +399,7 @@ def print_player_card(cm, player_id):
     print("----------------------------")
     print(f"Grande: {grande}\t|\tTutti: {tutti}")
 
-def session_menu(cm):
+def session_menu(cm: CachoManager):
     print_line()
     print("Session Menu:")
     select = None
@@ -372,6 +422,8 @@ def session_menu(cm):
             sys.exit()
         elif select == 'e':
             cm.end_current_session()
+            for x in cm.get_players_in_current_game():
+                print_player_card(cm, x[0])
             sys.exit()
     while True:
         value = input("Value: ")
@@ -403,7 +455,7 @@ def session_menu(cm):
     elif select == 't':
         cm.set_current_score_tutti(value)
         
-def start_game(cm):
+def start_game(cm: CachoManager):
     players = cm.get_players_in_current_game()
     cm.set_player_order(menu_player_order(players))
     cm.generate_game_session()
@@ -413,6 +465,16 @@ def start_game(cm):
         session_menu(cm)
         cm.get_next_player()
 
+def menu_player_stats(cm: CachoManager):
+    ids = []
+    for x in cm.db.get_table("players"):
+        ids.append(x[0])
+        print(x)
+    print(f"available id: {ids}")
+    select = input("Select Player number for stats: ")
+    if int(select) in ids:
+        for k, v in cm.generate_player_stats(int(select)).items():
+            print(f"{k}: {v}")
 
 def parse_args():
     """ docstring """
@@ -423,40 +485,40 @@ def parse_args():
     parser.add_argument("-l", "--list-players", action="store_true")
     parser.add_argument("-s", "--list-scores", action="store_true")
     parser.add_argument("-S", "--list-sessions", action="store_true")
+    parser.add_argument("-p", "--player-stats", action="store_true", help="Get player stats")
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = parse_args()
     logging.basicConfig(stream=sys.stdout)
-    if args.add_player:
-        db = CachoDBManager()
-        for x in db.get_player_names():
-            if x == args.add_player:
-                logging.error(f"User {args.add_user} already exists!")
-                sys.exit(1)
-        db.create_player(args.add_player)
-        sys.exit()
-    if args.list_players:
-        db = CachoDBManager()
-        print("Available Players")
-        for x in db.get_player_names():
-            print(x)
-        sys.exit()
-    if args.list_scores:
-        db = CachoDBManager()
-        db.print_table("scores")
-        sys.exit()
-    if args.list_sessions:
-        db = CachoDBManager()
-        table = db.get_table("sessions")
-        for row in table:
-            print(f"id: {row[0]} date: {db.get_session_date(int(row[0]))} high score id: {row[2]} low score id: {row[3]}")
-        sys.exit()
-    if args.create_game:
-        game_create_menu(CachoManager(), args.create_game)
-        sys.exit()
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
     cm = CachoManager()
+    if args.add_player:
+        for x in cm.db.get_player_names():
+            if x == args.add_player:
+                logging.error(f"User {args.add_user} already exists!")
+                sys.exit(1)
+        cm.db.create_player(args.add_player)
+        sys.exit()
+    elif args.player_stats:
+        menu_player_stats(cm)
+        sys.exit()
+    elif args.list_players:
+        print("Available Players")
+        for x in cm.db.get_player_names():
+            print(x)
+        sys.exit()
+    elif args.list_scores:
+        cm.db.print_table("scores")
+        sys.exit()
+    elif args.list_sessions:
+        table = cm.db.get_table("sessions")
+        for row in table:
+            print(f"id: {row[0]} date: {cm.db.get_session_date(int(row[0]))} high score id: {row[2]} low score id: {row[3]}")
+        sys.exit()
+    elif args.create_game:
+        game_create_menu(cm, args.create_game)
+        sys.exit()
     game_id = game_selection_menu(cm)
     start_game(cm)
