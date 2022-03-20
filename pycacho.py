@@ -259,7 +259,7 @@ class CachoManager():
                 high_score_value = sub_total
                 high_score_id = v
                 self.db.set_session_winner(self.curr_session_id, high_score_id)
-            elif sub_total < low_score_value:
+            if sub_total < low_score_value:
                 logging.debug(f"New low score replaces {low_score_value}")
                 low_score_value = sub_total
                 low_score_id = v
@@ -521,4 +521,9 @@ if __name__ == "__main__":
         game_create_menu(cm, args.create_game)
         sys.exit()
     game_id = game_selection_menu(cm)
-    start_game(cm)
+    try:
+        start_game(cm)
+    except Exception as e:
+        logging.exception(e)
+        logging.debug("Destroy current sessions...")
+        cm.delete_current_session()
