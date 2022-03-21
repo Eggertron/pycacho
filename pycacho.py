@@ -140,6 +140,9 @@ class CachoDBManager():
                 total += value
         result["total"] = total
         return result
+    def get_game_description(self, game_id:int) -> str:
+        self.cur.execute(f"SELECT description FROM games WHERE id = {game_id}")
+        return self.cur.fetchone()[0]
     def get_game(self, game_id):
         self.cur.execute(f"SELECT * FROM games WHERE id = {game_id}")
         return self.cur.fetchone()
@@ -202,7 +205,7 @@ class CachoManager():
         self.db.update_score(sid, "tutti", value)
     def set_current_score_tutti(self, value):
         self.set_score_tutti(value, self.get_current_player_score_id())
-    def get_current_player(self):
+    def get_current_player(self) -> int:
         return self.player_queue[self.queue_index]
     def get_next_player(self):
         self.queue_index = (self.queue_index + 1) % len(self.player_queue)
@@ -281,15 +284,19 @@ class CachoManager():
             score_id = self.db.create_score(player_id, self.curr_session_id, self.curr_game_id)
             self.player_scores[str(player_id)] = score_id
         return self.curr_session_id
-    def generate_player_stats(self, player_id: int) -> dict:
+    def generate_player_stats(self, player_id: int, game_id=None) -> dict:
         scores = self.db.get_scores_by_player_id_as_dict_list(player_id)
+        logging.debug(f"list of scores: {scores}")
+        if game_id:
+            scores = [x for x in scores if int(x["game_id"]) == int(game_id)]
+            logging.debug(f"list of scores with game_id of {game_id}: {scores}")
         games_played = len(scores)
         total_grandes = 0
         total_tuttis = 0
         total_wins = self.db.get_sessions_won_by_player_id(player_id)
-        print(f"sessions won: {total_wins}")
+        logging.debug(f"sessions won: {total_wins}")
         total_last = self.db.get_sessions_lowest_by_player_id(player_id)
-        print(f"sessions lowest score: {total_last}")
+        logging.debug(f"sessions lowest score: {total_last}")
         total_score = 0
         high_score = 0
         for score in scores:
@@ -304,7 +311,7 @@ class CachoManager():
             "player name": self.db.get_player_name(player_id),
             "games played": games_played,
             "high score": high_score,
-            "average score": total_score / games_played,
+            "average score": total_score / games_played if games_played != 0 else 0,
             "total Grandes": total_grandes,
             "total Tuttis": total_tuttis,
             "total wins": len(total_wins),
@@ -405,7 +412,7 @@ def session_menu(cm: CachoManager):
     select = None
     while True:
         print("Enter slot 1 - 6 or s=straight, f=full, p=poker, g=grande, t=tutti")
-        print("c=card, v=view all, q=quit(delete), e=end game")
+        print("c=card, v=view all cards, a=stats, q=quit(delete), e=end game")
         select = input("Selection: ")
         logging.debug(f"Selection: {select}")
         if not select:
@@ -425,6 +432,10 @@ def session_menu(cm: CachoManager):
             for x in cm.get_players_in_current_game():
                 print_player_card(cm, x[0])
             sys.exit()
+        elif select == 'a':
+            print(f"These are your stats for game called {cm.db.get_game_description(cm.curr_game_id)}")
+            for k,v in cm.generate_player_stats(cm.get_current_player(), cm.curr_game_id).items():
+                print(f"{k}: {v}")
     while True:
         value = input("Value: ")
         try:
@@ -470,7 +481,7 @@ def menu_player_stats(cm: CachoManager):
     for x in cm.db.get_table("players"):
         ids.append(x[0])
         print(x)
-    print(f"available id: {ids}")
+    logging.debug(f"available id: {ids}")
     select = input("Select Player number for stats: ")
     if int(select) in ids:
         for k, v in cm.generate_player_stats(int(select)).items():
@@ -490,9 +501,12 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    logging.basicConfig(stream=sys.stdout)
     if args.verbose:
-        logging.basicConfig(level=logging.DEBUG)
+        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+        logging.info("verbose mode set")
+        logging.debug("verbose mode set")
+    else:
+        logging.basicConfig(stream=sys.stdout)
     cm = CachoManager()
     if args.add_player:
         for x in cm.db.get_player_names():
