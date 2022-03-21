@@ -1,0 +1,22 @@
+<!doctype html>
+    <title>Cacho Session Selection Form</title>
+    <body>
+            
+        {% if sessions %}
+        <h1>Sessions!</h1>
+        <form method="post">
+            Select Sessions to show scores
+            <br><select name="session_id" id="session_id">
+                {% for session in sessions %}
+                <option value="{{ session['id'] }}">{{ session['id'] }} - {{ session['date'] }}</option>
+                {% endfor %}
+            </select>
+            <br>
+            <button type="submit">Submit</button>
+        </form>
+        {% else %}
+        <h1>Hello, World!</h1>
+        {% endif %}
+
+    </body>
+</html>

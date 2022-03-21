@@ -1,0 +1,18 @@
+<!doctype html>
+    <title>Cacho Score Edit Form</title>
+    <body>
+            
+        {% if data %}
+        Player: {{ data['player_name'] }}<br>
+        Update Key: {{ data['col_name'] }}<br>
+        <form method="post">
+            <input name="value" id="value" placeholder="{{ data['current_value'] }}">
+            <br>
+            <button type="submit">Submit</button>
+        </form>
+        {% else %}
+        <h1>No Data</h1>
+        {% endif %}
+
+    </body>
+</html>

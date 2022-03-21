@@ -13,6 +13,7 @@ class CachoDBManager():
                 "scores": "INSERT INTO scores(id, player_id, session_id, game_id, ones, twos, threes, fours, fives, sixes, straight, full, poker, grande, tutti) VALUES(NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             }
     SCORE_COLS = ["id", "player_id", "session_id", "game_id", "ones", "twos", "threes", "fours", "fives", "sixes", "straight", "full", "poker", "grande", "tutti"]
+    SESSION_COLS = ["id", "date", "high_score_id", "low_score_id"]
     def __init__(self, db="cacho_data.db"):
         """ docstring """
         self.init_all_tables = False
@@ -44,6 +45,16 @@ class CachoDBManager():
         table = self.get_table(table)
         for row in table:
             print(row)
+    def get_sessions(self) -> list:
+        """ returns a list of sessions dictionary with keys:
+            "id", "date", "high_score_id", "low_score_id"
+        """
+        return [ self.zip_to_dict(self.SESSION_COLS, s) for s in self.get_table("sessions")]
+    def zip_to_dict(self, Key_list: list, value_list: list) -> dict:
+        result = {}
+        for k, v in zip(Key_list, value_list):
+            result[k] = v
+        return result
     def get_table(self, table: str):
         self.cur.execute(f'SELECT * FROM {table}')
         return self.cur.fetchall()
@@ -101,29 +112,16 @@ class CachoDBManager():
     def get_score(self, score_id: int):
         """ docstring """
         self.cur.execute(f"SELECT * FROM scores WHERE id = {score_id}")
-        return self.cur.fetchone()
-    def get_scores_from_session_id(self, session_id: int):
+        return self.score_to_dict(self.cur.fetchone())
+    def get_scores_from_session_id(self, session_id: int) -> list:
         self.cur.execute(f"SELECT * FROM scores WHERE session_id = {session_id}")
-        return self.cur.fetchall()
+        return [self.score_to_dict(score) for score in self.cur.fetchall()]
     def get_scores_from_session_id_dict(self, session_id: int) -> dict:
+        """ returns { "{player_id}": {score}, ... } """
         result = {}
         logging.debug(self.get_scores_from_session_id(session_id))
         for score in self.get_scores_from_session_id(session_id):
-            _, player_id, _, game_id, o, t, th, f, fi, s, st, fu, p, g, tu = score
-            result[player_id] = {
-                "game_id": game_id,
-                "ones": o,
-                "twos": t,
-                "threes": th,
-                "fours": f,
-                "fives": fi,
-                "sixes": s,
-                "straight": st,
-                "full": fu,
-                "poker": p,
-                "grande": g,
-                "tutti": tu
-            }
+            result[str(score["player_id"])] = score
         return result
     def get_scores_by_player_id_as_dict_list(self, player_id: int) -> list:
         return [self.score_to_dict(x) for x in self.get_scores_by_player_id(player_id)]
@@ -131,14 +129,9 @@ class CachoDBManager():
         self.cur.execute(f"SELECT * FROM scores WHERE player_id = {player_id}")
         return self.cur.fetchall()
     def score_to_dict(self, score_list) -> dict:
-        result = {}
-        total = 0
-        for index, value in enumerate(score_list):
-            col = self.SCORE_COLS[index]
-            result[col] = value
-            if "id" not in col:
-                total += value
-        result["total"] = total
+        result = self.zip_to_dict(self.SCORE_COLS, score_list)
+        result["total"] = sum([int(v) for k,v in result.items() if "id" not in k and v != -1])
+        result["player_name"] = self.get_player_name(result["player_id"])
         return result
     def get_game_description(self, game_id:int) -> str:
         self.cur.execute(f"SELECT description FROM games WHERE id = {game_id}")
@@ -214,7 +207,7 @@ class CachoManager():
         return self.player_scores[str(self.get_current_player())]
     def get_current_player_score_card(self):
         return self.get_score_card(self.get_current_player_score_id())
-    def get_score_card(self, score_id):
+    def get_score_card(self, score_id: int) -> dict:
         return self.db.get_score(score_id)
     def get_list_of_games(self):
         return self.db.get_table("games")
@@ -244,39 +237,27 @@ class CachoManager():
         low_score_id = None
         low_score_value = 10000
         high_score_value = 0
-        score_cols = ["id", "player_id", "session_id", "game_id", "ones", "twos", "threes", "fours", "fives", "sixes", "straight", "full", "poker", "grande", "tutti"]
-        for k, v in self.player_scores.items():
-            sub_total = 0
-            for index, score in enumerate(self.db.get_score(v)):
+        for _, score_id in self.player_scores.items():
+            score = self.db.get_score(score_id)
+            for k, v in score:
                 logging.debug(f"score: {score}")
-                if index < 4:
-                    continue
-                if score == -1:
-                    self.db.update_score(v, score_cols[index], 0)  # update the scores
-                else:
-                    sub_total += score
-                logging.debug(f"Updated score: {self.db.get_score(v)}")
-            logging.debug(f"Total for this score: {sub_total}")
-            if sub_total > high_score_value:
+                if v == -1:
+                    self.db.update_score(score_id, k, 0)  # update the scores in database
+                logging.debug(f"Updated score: {self.db.get_score(score_id)}")
+            logging.debug(f"Total for this score: {score['total']}")
+            if score["total"] > high_score_value:
                 logging.debug(f"New high score replaces {high_score_value}")
-                high_score_value = sub_total
-                high_score_id = v
+                high_score_value = score["total"]
+                high_score_id = score_id
                 self.db.set_session_winner(self.curr_session_id, high_score_id)
-            if sub_total < low_score_value:
+            if score["total"] < low_score_value:
                 logging.debug(f"New low score replaces {low_score_value}")
-                low_score_value = sub_total
-                low_score_id = v
+                low_score_value = score["total"]
+                low_score_id = score_id
                 self.db.set_session_looser(self.curr_session_id, low_score_id)
 
     def get_current_total(self):
-        return self.get_total(self.get_current_player_score_card())
-    def get_total(self, scores):
-        scores = scores[4:]
-        total = 0
-        for score in scores:
-            if score != -1:
-                total += score
-        return total
+        return self.get_current_player_score_card()["total"]
     def generate_game_session(self):
         self.curr_session_id = self.db.create_session()
         self.player_scores = {}
@@ -380,31 +361,19 @@ def menu_player_order(players):
         if select not in player_order:
             player_order.append(select)
     return player_order
-def print_current_player_card(cm):
+def print_current_player_card(cm: CachoManager):
     print_player_card(cm, cm.get_current_player())
-def print_player_card(cm, player_id):
+def print_player_card(cm: CachoManager, player_id: int):
     print_line()
-    player_name = cm.db.get_player_name(player_id)
     score_card = cm.get_score_card(cm.player_scores[str(player_id)])
-    one = score_card[4]
-    two = score_card[5]
-    three = score_card[6]
-    four = score_card[7]
-    five = score_card[8]
-    six = score_card[9]
-    straight = score_card[10]
-    full = score_card[11]
-    poker = score_card[12]
-    grande = score_card[13]
-    tutti = score_card[14]
-    print(f"Player: {player_name}\t|\tTotal: {cm.get_total(score_card)}")
-    print(f"{one}\t|\t{straight}\t|\t{four}")
+    print(f"Player: {score_card['player_name']}\t|\tTotal: {score_card['total']}")
+    print(f"{score_card['ones']}\t|\t{score_card['straight']}\t|\t{score_card['fours']}")
     print("----------------------------")
-    print(f"{two}\t|\t{full}\t|\t{five}")
+    print(f"{score_card['twos']}\t|\t{score_card['full']}\t|\t{score_card['fives']}")
     print("----------------------------")
-    print(f"{three}\t|\t{poker}\t|\t{six}")
+    print(f"{score_card['threes']}\t|\t{score_card['poker']}\t|\t{score_card['sixes']}")
     print("----------------------------")
-    print(f"Grande: {grande}\t|\tTutti: {tutti}")
+    print(f"Grande: {score_card['grande']}\t|\tTutti: {score_card['tutti']}")
 
 def session_menu(cm: CachoManager):
     print_line()
