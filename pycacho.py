@@ -16,6 +16,7 @@ class CachoDBManager():
     SCORE_COLS = ["id", "player_id", "session_id", "game_id", "ones", "twos", "threes", "fours", "fives", "sixes", "straight", "full", "poker", "grande", "tutti"]
     SESSION_COLS = ["id", "date", "high_score_id", "low_score_id"]
     GAMES_COLS = ["id", "players", "description"]
+    PLAYER_COLS = ["id", "description"]
     def __init__(self, db="cacho_data.db"):
         """ docstring """
         self.init_all_tables = False
@@ -65,6 +66,9 @@ class CachoDBManager():
     def get_table(self, table: str):
         self.cur.execute(f'SELECT * FROM {table}')
         return self.cur.fetchall()
+    def get_players(self) -> list:
+        """ returns list of player dictionaries: id, description """
+        return [ self.zip_to_dict(self.PLAYER_COLS, p) for p in self.get_table("players") ]
     def create_player(self, player_name):
         """ docstring """
         return self.insert("players", (player_name,))

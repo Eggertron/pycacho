@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<head>
+    <title>Players</title>
+</head>
+<body>
+    <h1>Players</h1>
+    <table>
+        <tr>
+            <td>Player ID</td>
+            <td>Player Name</td>
+        </tr>
+        {% for player_id, data in players.items() %}
+        <tr>
+            <td>{{ player_id }}</td>
+            <td>{{ data['description'] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <h1>Create New Player</h1>
+    <form method="post">
+        <input name="description" id="description" placeholder="Player Name Here">
+        <button type="submit">Create Player</button>
+    </form>
+</body>
+</html>

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<head>
+    <title>Games</title>
+</head>
+<body>
+    <h1>List of Games</h1>
+    <table>
+        <tr>
+            <td>Game ID</td>
+            <td>Game Description</td>
+            <td>Players in Game</td>
+        </tr>
+        {% for id, data in data.items() %}
+        <tr>
+            <td>{{ id }}</td>
+            <td>{{ data['description'] }}</td>
+            <td>{{ data['player_names'] }}</td>
+            <td>▶️</td>
+            <td>🗑️</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <h1>Create new game</h1><br>
+    <form method="post">
+        <input name="description" id="description" placeholder="description">
+        <br>
+        <button type="submit">Create</button>
+    </form>
+</body>
+</html>

@@ -24,6 +24,19 @@ def new_session():
     games = get_games()
     return render_template("new_session_form.html", data=games)
 
+@app.route("/players")
+def players():
+    db = CachoDBManager()
+    players = {}
+    for player in db.get_players():
+        players[player["id"]] = player
+    return render_template("players_form.html", players=players)
+
+@app.route("/games")
+def games():
+    games = get_games()
+    return render_template("games_form.html", data=games)
+
 @app.route("/api/games")
 def get_games():
     db = CachoDBManager()
