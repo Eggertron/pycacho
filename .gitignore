@@ -129,3 +129,4 @@ dmypy.json
 .pyre/
 
 cacho_data.db
+*.db*

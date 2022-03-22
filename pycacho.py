@@ -274,10 +274,12 @@ class CachoManager():
         games_played = len(scores)
         total_grandes = 0
         total_tuttis = 0
-        total_wins = self.db.get_sessions_won_by_player_id(player_id)
-        logging.debug(f"sessions won: {total_wins}")
-        total_last = self.db.get_sessions_lowest_by_player_id(player_id)
-        logging.debug(f"sessions lowest score: {total_last}")
+        sessions_won = [ int(x) for x in self.db.get_sessions_won_by_player_id(player_id) ]
+        logging.debug(f"sessions won: {sessions_won}")
+        total_wins = [ x for x in scores if int(x["game_id"]) == int(game_id) and int(x["session_id"]) in sessions_won ]
+        sessions_lowest = [ int(x) for x in self.db.get_sessions_lowest_by_player_id(player_id) ]
+        total_last = [ x for x in scores if int(x["game_id"]) == int(game_id) and int(x["session_id"]) in sessions_lowest ]
+        logging.debug(f"sessions lowest score: {sessions_lowest}")
         total_score = 0
         high_score = 0
         for score in scores:
@@ -295,8 +297,10 @@ class CachoManager():
             "average score": total_score / games_played if games_played != 0 else 0,
             "total Grandes": total_grandes,
             "total Tuttis": total_tuttis,
-            "total wins": len(total_wins),
-            "total last place": len(total_last)
+            "total wins": len(sessions_won),
+            "total last place": len(sessions_lowest),
+            "subtotal wins": len(total_wins),
+            "subtotal last places": len(total_last)
         }
     
 

@@ -29,6 +29,20 @@ def get_session(id=None):
 
 @app.route("/session/<session_id>")
 def session(session_id=None):
+    cm = CachoManager()
+    scores = cm.db.get_scores_from_session_id_dict(int(session_id))
+    data = {}
+    for _, v in scores.items():
+        data[v["player_name"]] = fix_score(v)
+        data[v["player_name"]]["stats"] = cm.generate_player_stats(v["player_id"], v["game_id"])
+    debug = request.args.get('debug')
+    if debug:
+        data['debug'] = debug
+    title = f"Game Session: {session_id}"
+    return render_template("session.html", title=title, data=data)
+
+@app.route("/session_/<session_id>")
+def session_(session_id=None):
     db = CachoDBManager()
     scores = db.get_scores_from_session_id_dict(int(session_id))
     data = {}
@@ -38,7 +52,7 @@ def session(session_id=None):
     if debug:
         data['debug'] = debug
     title = f"Game Session: {session_id}"
-    return render_template("session.html", title=title, data=data)
+    return render_template("session_.html", title=title, data=data)
 
 @app.route("/score/edit/<score_id>/<col>", methods=["GET", "POST"])
 def edit_score_form(score_id=None, col=None):
@@ -64,7 +78,7 @@ def edit_score(score_id=None, col=None, value=None):
     db = CachoDBManager()
     score = db.get_score(score_id)
     db.update_score(int(score_id), str(col), int(value))
-    return redirect(f"/session/{score['session_id']}")
+    return redirect(f"/session_/{score['session_id']}")
 
 @app.route("/api/score/<score_id>")
 def get_score_card(score_id=None):

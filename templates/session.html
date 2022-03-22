@@ -14,7 +14,6 @@
             }
             table {
                 border-spacing: 10px;
-                width: 50%;
             }
         </style>
         <title>{{ title }}</title>
@@ -23,32 +22,43 @@
         {% if data['debug'] %}
         DEBUG MODE
         {% endif %}
-        {% for k, v in data.items() %}
+        {% for player_name, v in data.items() %}
         <table>
             <tr>
-                <td><b>{{ k }}</b></td>
+                <td><button onclick="function{{ v['player_id'] }}()">{{ player_name }}</button></td>
                 <td>Total: {{ v["total"] }}</td>
             </tr>
             <tr>
-                <td>Balas: {{ v["ones"] }} <a href="/score/edit/{{ v['id'] }}/ones">📝</a></td>
-                <td>Escalera: {{ v["straight"] }} <a href="/score/edit/{{ v['id'] }}/straight">📝</a></td>
-                <td>Cuadras: {{ v["fours"] }} <a href="/score/edit/{{ v['id'] }}/fours">📝</a></td>
+                <td>Balas: {{ v["ones"] }}</td>
+                <td>Escalera: {{ v["straight"] }}</td>
+                <td>Cuadras: {{ v["fours"] }}</td>
             </tr>
             <tr>
-                <td>Duces: {{ v["twos"] }} <a href="/score/edit/{{ v['id'] }}/twos">📝</a></td>
-                <td>Full: {{ v["full"] }} <a href="/score/edit/{{ v['id'] }}/full">📝</a></td>
-                <td>Qinas: {{ v["fives"] }} <a href="/score/edit/{{ v['id'] }}/fives">📝</a></td>
+                <td>Duces: {{ v["twos"] }}</td>
+                <td>Full: {{ v["full"] }}</td>
+                <td>Qinas: {{ v["fives"] }}</td>
             </tr>
             <tr>
-                <td>Trenes: {{ v["threes"] }} <a href="/score/edit/{{ v['id'] }}/threes">📝</a></td>
-                <td>Poker: {{ v["poker"] }} <a href="/score/edit/{{ v['id'] }}/poker">📝</a></td>
-                <td>Sena: {{ v["sixes"] }} <a href="/score/edit/{{ v['id'] }}/sixes">📝</a></td>
+                <td>Trenes: {{ v["threes"] }}</td>
+                <td>Poker: {{ v["poker"] }}</td>
+                <td>Sena: {{ v["sixes"] }}</td>
             </tr>
             <tr>
-                <td>Grande: {{ v["grande"] }} <a href="/score/edit/{{ v['id'] }}/grande">📝</a></td>
-                <td>Tutti: {{ v["tutti"] }} <a href="/score/edit/{{ v['id'] }}/tutti">📝</a></td>
+                <td>Grande: {{ v["grande"] }}</td>
+                <td>Tutti: {{ v["tutti"] }}</td>
             </tr>
         </table>
+        {% if "stats" in v %}
+        <script>
+            msg{{ v['player_id'] }} = "Stats for {{ player_name }} records in this group\n";
+            {% for key, value in v['stats'].items() %}
+            msg{{ v['player_id'] }} += "{{ key }}: {{ value }}\n"
+            {% endfor %}
+            function function{{ v['player_id'] }}() {
+                alert(msg{{ v['player_id'] }});
+            }
+        </script>
+        {% endif %}
         {% endfor %}
     </body>
 </html>
