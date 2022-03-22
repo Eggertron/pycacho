@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<head>
+    <title>Select a Game</title>
+</head>
+<body>
+    <h1>Select a game to start your new session</h1>
+
+    <form method="post">
+        <br><select name="game_id" id="game_id">
+            {% for id, info in data.items() %}
+            <option value="{{ id }}">{{ id }} - {{ info['description'] }} : {{ info["player_names"]}}</option>
+            {% endfor %}
+        </select>
+        <br>
+        <button type="submit">Submit</button>
+    </form>
+</body>
+</html>

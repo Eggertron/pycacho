@@ -5,6 +5,7 @@ import os
 import sqlite3
 import sys
 
+
 class CachoDBManager():
     TABLES_INSERT ={
                 "players": "INSERT INTO players(id, description) VALUES(NULL, ?)",
@@ -14,6 +15,7 @@ class CachoDBManager():
             }
     SCORE_COLS = ["id", "player_id", "session_id", "game_id", "ones", "twos", "threes", "fours", "fives", "sixes", "straight", "full", "poker", "grande", "tutti"]
     SESSION_COLS = ["id", "date", "high_score_id", "low_score_id"]
+    GAMES_COLS = ["id", "players", "description"]
     def __init__(self, db="cacho_data.db"):
         """ docstring """
         self.init_all_tables = False
@@ -55,6 +57,11 @@ class CachoDBManager():
         for k, v in zip(Key_list, value_list):
             result[k] = v
         return result
+    def get_games(self) -> list:
+        """ returns a list of games as dictionary  with keys:
+            "id", "players", "description"
+        """
+        return [ self.zip_to_dict(self.GAMES_COLS, g) for g in self.get_table("games")]
     def get_table(self, table: str):
         self.cur.execute(f'SELECT * FROM {table}')
         return self.cur.fetchall()
@@ -114,6 +121,7 @@ class CachoDBManager():
         self.cur.execute(f"SELECT * FROM scores WHERE id = {score_id}")
         return self.score_to_dict(self.cur.fetchone())
     def get_scores_from_session_id(self, session_id: int) -> list:
+        """ returns a list of score dictionaries """
         self.cur.execute(f"SELECT * FROM scores WHERE session_id = {session_id}")
         return [self.score_to_dict(score) for score in self.cur.fetchall()]
     def get_scores_from_session_id_dict(self, session_id: int) -> dict:
@@ -138,7 +146,7 @@ class CachoDBManager():
         return self.cur.fetchone()[0]
     def get_game(self, game_id):
         self.cur.execute(f"SELECT * FROM games WHERE id = {game_id}")
-        return self.cur.fetchone()
+        return self.zip_to_dict(self.GAMES_COLS, self.cur.fetchone())
     def insert(self, table, entities):
         """ docstring """
         insert_str = self.TABLES_INSERT[table]
@@ -217,7 +225,7 @@ class CachoManager():
         return [ (x, self.db.get_player_name(x)) for x in self.get_player_ids(game_id) ]
     def get_player_ids(self, game_id):
         game = self.db.get_game(game_id)
-        return [ int(x) for x in game[1].split(",") ]
+        return [ int(x) for x in game["players"].split(",") ]
     def get_all_players(self):
         return self.db.get_table("players")
     def player_ids_to_names(self, player_ids):
@@ -232,6 +240,11 @@ class CachoManager():
             self.db.delete_record_id("scores", v)
         logging.debug(f"Deleting session id: {self.curr_session_id}")
         self.db.delete_record_id("sessions", self.curr_session_id)
+    def delete_active_session(self, session_id: int):
+        """ deletes active session including scores """
+        for score in self.db.get_scores_from_session_id(session_id):
+            self.db.delete_record_id("scores", score["id"])
+        self.db.delete_record_id("sessions", session_id)
     def end_current_session(self):
         high_score_id = None
         low_score_id = None
@@ -259,12 +272,18 @@ class CachoManager():
     def get_current_total(self):
         return self.get_current_player_score_card()["total"]
     def generate_game_session(self):
-        self.curr_session_id = self.db.create_session()
+        self.curr_session_id = self.generate_session(game_id)
         self.player_scores = {}
-        for player_id in self.player_queue:
-            score_id = self.db.create_score(player_id, self.curr_session_id, self.curr_game_id)
-            self.player_scores[str(player_id)] = score_id
+        for score in self.db.get_scores_from_session_id(self.curr_session_id):
+            player_id = str(score["player_id"])
+            self.player_scores[player_id] = score["id"]
         return self.curr_session_id
+    def generate_session(self, game_id: int) -> int:
+        player_ids = self.get_player_ids(game_id)
+        session_id = self.db.create_session()
+        for player_id in player_ids:
+            self.db.create_score(player_id, session_id, game_id)
+        return session_id
     def generate_player_stats(self, player_id: int, game_id=None) -> dict:
         scores = self.db.get_scores_by_player_id_as_dict_list(player_id)
         logging.debug(f"list of scores: {scores}")

@@ -1,3 +1,4 @@
+from crypt import methods
 from distutils.command.config import config
 from flask import Flask, jsonify, render_template, request, flash, redirect, url_for
 from flask_cors import CORS
@@ -9,8 +10,43 @@ app.config.from_object(__name__)
 CORS(app, resources={r"/*": {'origins': "*"}})
 
 # Main single page React
-@app.route("/", methods=["GET", "POST"])
-def greetings():
+@app.route("/")
+def index():
+    return render_template('index.html')
+
+@app.route("/new_session", methods=["GET", "POST"])
+def new_session():
+    if request.method == "POST":
+        cm = CachoManager()
+        game_id = request.form["game_id"]
+        session_id = cm.generate_session(game_id)
+        return redirect(f"/session_/{session_id}")
+    games = get_games()
+    return render_template("new_session_form.html", data=games)
+
+@app.route("/api/games")
+def get_games():
+    db = CachoDBManager()
+    games = db.get_games()
+    print(games)
+    data = {}
+    for game in games:
+        names = " , ".join([db.get_player_name(n) for n in game['players'].split(',')])
+        data[str(game['id'])] = {
+            "id": game['id'],
+            "player_ids": game['players'],
+            "player_names": names,
+            "description": game['description']
+        }
+    return data
+
+@app.route("/new_game")
+def new_game():
+    cm = CachoManager()
+    
+
+@app.route("/session_selector", methods=["GET", "POST"])
+def session_selector():
     if request.method == 'POST':
         session_id = request.form['session_id']
 
@@ -26,6 +62,12 @@ def get_session(id=None):
     db = CachoDBManager()
     session =  db.get_scores_from_session_id_dict(int(id))
     return session
+
+@app.route("/api/session/purge/<id>")
+def purge_session(id=None):
+    cm = CachoManager()
+    cm.delete_active_session(int(id))
+    return redirect(url_for("index"))
 
 @app.route("/session/<session_id>")
 def session(session_id=None):
