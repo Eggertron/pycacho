@@ -50,6 +50,9 @@
             </tr>
         </table>
         {% endfor %}
+        <br><br><br>
+        <a href="/api/session/end/{{ title.split(':')[1].strip() }}">End this game session</a>
+        <br><br><br>
         <a href="/api/session/purge/{{ title.split(':')[1].strip() }}">!!Delete this game session!!</a>
     </body>
 </html>

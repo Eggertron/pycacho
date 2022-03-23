@@ -70,6 +70,12 @@ def session_selector():
     cm = CachoManager()
     return render_template('session_select_form.html', sessions=cm.db.get_sessions())
 
+@app.route("/api/session/end/<id>")
+def end_session(id=None):
+    cm = CachoManager()
+    cm.end_session_id(id)
+    return redirect(url_for("index"))
+
 @app.route("/api/session/<id>")
 def get_session(id=None):
     db = CachoDBManager()

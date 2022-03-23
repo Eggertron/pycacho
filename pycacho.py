@@ -249,6 +249,19 @@ class CachoManager():
         for score in self.db.get_scores_from_session_id(session_id):
             self.db.delete_record_id("scores", score["id"])
         self.db.delete_record_id("sessions", session_id)
+    def end_session_id(self, session_id: int):
+        scores = self.db.get_scores_from_session_id_dict(session_id)
+        print(scores)
+        high_score = (None, 0)
+        low_score = (None, 1000)
+        for id, score in scores.items():
+            total = int(score["total"])
+            if total > high_score[1]:
+                high_score = (int(id), total)
+            if total < low_score[1]:
+                low_score = (int(id), total)
+        self.db.set_session_looser(session_id, low_score[0])
+        self.db.set_session_winner(session_id, high_score[0])
     def end_current_session(self):
         high_score_id = None
         low_score_id = None
