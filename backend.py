@@ -1,5 +1,6 @@
 from crypt import methods
 from distutils.command.config import config
+from select import select
 from flask import Flask, jsonify, render_template, request, flash, redirect, url_for
 from flask_cors import CORS
 from pycacho import CachoDBManager, CachoManager
@@ -126,11 +127,36 @@ def edit_score_form(score_id=None, col=None):
             return redirect(f"/api/score/edit/{score_id}/{col}/{value}")
     db = CachoDBManager()
     score = db.get_score(int(score_id))
+    mult = 0
+    if col == "ones":
+        mult = 1
+    elif col == "twos":
+        mult = 2
+    elif col == "threes":
+        mult = 3
+    elif col == "fours":
+        mult = 4
+    elif col == "fives":
+        mult = 5
+    elif col == "sixes":
+        mult = 6
+    selections = [ x * mult for x in range(7)]
+    if col == "straight":
+        selections = [ 0, 20, 25]
+    elif col == "full":
+        selections = [ 0, 30, 35]
+    elif col == "poker":
+        selections = [ 0, 40, 45]
+    elif col == "grande":
+        selections = [ 0, 50]
+    elif col == "tutti":
+        selections = [ 0, 100]
     data = {
         "score_id": score_id,
         "player_name": score["player_name"],
         "current_value": score[col],
-        "col_name": col
+        "col_name": col,
+        "selections": selections
     }
     return render_template("edit_score_form.html", data=data)
 

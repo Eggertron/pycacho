@@ -15,6 +15,9 @@
             table {
                 border-spacing: 10px;
             }
+            .rose {
+                position:absolute;
+            }
         </style>
         <title>{{ title }}</title>
     </head>
@@ -60,5 +63,24 @@
         </script>
         {% endif %}
         {% endfor %}
+        <div class="rose">🌹</div>
+        <div class="rose">🌹</div>
+        <div class="rose">🌹</div>
+        <script type="text/javascript">
+            var body = document.getElementsByTagName('body')[0];
+            var roses = document.getElementsByClassName('rose'); // get rose elements
+            var roseSize = 30;
+            // random position each rose and set size
+            for (var i = 0; i < roses.length; i++) {
+                randomPositionRose(roses[i]);
+                roses[i].style.height = roseSize + "px";
+                roses[i].style.width = roseSize + "px";
+            }
+            // randomly position ant at edge of screen
+            function randomPositionRose(rose) {
+                rose.yLoc = Math.random() * body.clientHeight;
+                rose.xLoc = Math.random() * body.clientWidth;
+            };
+        </script>
     </body>
 </html>

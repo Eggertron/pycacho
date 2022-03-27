@@ -6,6 +6,14 @@
         Player: {{ data['player_name'] }}<br>
         Update Key: {{ data['col_name'] }}<br>
         <form method="post">
+            <table>
+                <tr>
+                    {% for x in data['selections'] %}
+                    <td><a href="/api/score/edit/{{ data['score_id'] }}/{{ data['col_name'] }}/{{ x }}">(( {{ x }} ))</a></td>
+                    {% endfor %}
+                </tr>
+            </table>
+            <br><br><br>
             <input name="value" id="value" placeholder="{{ data['current_value'] }}">
             <br>
             <button type="submit">Submit</button>
