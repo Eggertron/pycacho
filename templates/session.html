@@ -37,7 +37,7 @@
                 <td>Cuadras: {{ v["fours"] }}</td>
             </tr>
             <tr>
-                <td>Duces: {{ v["twos"] }}</td>
+                <td>Duques: {{ v["twos"] }}</td>
                 <td>Full: {{ v["full"] }}</td>
                 <td>Qinas: {{ v["fives"] }}</td>
             </tr>
@@ -67,6 +67,9 @@
         <div class="rose">🌹</div>
         <div class="rose">🌹</div>
         <script type="text/javascript">
+            setTimeout(function(){
+                window.location.reload(1);
+            }, 5000);
             var body = document.getElementsByTagName('body')[0];
             var roses = document.getElementsByClassName('rose'); // get rose elements
             var roseSize = 30;

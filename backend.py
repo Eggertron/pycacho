@@ -140,7 +140,7 @@ def edit_score_form(score_id=None, col=None):
         mult = 5
     elif col == "sixes":
         mult = 6
-    selections = [ x * mult for x in range(7)]
+    selections = [ x * mult for x in range(6)]
     if col == "straight":
         selections = [ 0, 20, 25]
     elif col == "full":
